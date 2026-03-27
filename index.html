@@ -6,34 +6,155 @@
 <title>GrowLog</title>
 
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="styles.css">
 
-<meta name="theme-color" content="#111">
+<style>
+body { font-family: Arial; background:#111; color:#fff; padding:16px }
+.card { background:#1b1b1b; padding:12px; border-radius:12px; margin-bottom:12px }
+input, select, button { width:100%; padding:10px; margin-top:6px; border-radius:8px; border:none }
+button { background:#4caf50; color:#fff }
+
+.lux-low { color:#ffc107 }
+.lux-ok { color:#4caf50 }
+.lux-high { color:#ff9800 }
+.lux-danger { color:#f44336 }
+</style>
 </head>
 
 <body>
 
-<header class="app-header">
-<button id="menu-btn">☰</button>
-<h1>🌱 GrowLog</h1>
-<button id="add-plant-btn">＋</button>
-</header>
+<h2>🌱 GrowLog</h2>
 
-<main>
+<div class="card">
+<h3>Nova Planta</h3>
 
-<section>
-<h2>Resumo</h2>
-<div id="status-list"></div>
-</section>
+<input id="name" placeholder="Nome da planta">
 
-<section>
-<h2>Plantas</h2>
-<div id="plants-list"></div>
-</section>
+<select id="cycle">
+<option value="2-1">2 com nutriente / 1 sem</option>
+<option value="1-1">1 com nutriente / 1 sem</option>
+<option value="3-1">3 com nutriente / 1 sem</option>
+</select>
 
-</main>
+<button onclick="addPlant()">Salvar</button>
+</div>
 
-<script src="app.js"></script>
+<div id="plants"></div>
+
+<script>
+
+// ================= DADOS =================
+let plants = JSON.parse(localStorage.getItem('growlog_v4') || '[]')
+
+// ================= SAVE =================
+function save() {
+  localStorage.setItem('growlog_v4', JSON.stringify(plants))
+  render()
+}
+
+// ================= ADD PLANT =================
+function addPlant() {
+  const name = document.getElementById('name').value
+  const cycle = document.getElementById('cycle').value
+
+  plants.push({
+    id: Date.now(),
+    name,
+    cycle,
+    history: [],
+    lux: null,
+    startDate: Date.now()
+  })
+
+  save()
+}
+
+// ================= WATER =================
+function addWater(id, nutrient) {
+  const plant = plants.find(p => p.id === id)
+  plant.history.push(nutrient)
+  save()
+}
+
+// ================= NEXT WATER =================
+function nextWatering(plant) {
+  const [n, w] = plant.cycle.split('-').map(Number)
+
+  const seq = [
+    ...Array(n).fill(true),
+    ...Array(w).fill(false)
+  ]
+
+  return seq[plant.history.length % seq.length]
+}
+
+// ================= LUX =================
+function luxStatus(lux, days) {
+  if (!lux) return ['-', '']
+
+  // regra simples por estágio aproximado
+  if (days < 10) {
+    if (lux < 3000) return ['baixo', 'lux-low']
+    if (lux < 10000) return ['adequado', 'lux-ok']
+    return ['alto', 'lux-high']
+  }
+
+  if (days < 40) {
+    if (lux < 10000) return ['baixo', 'lux-low']
+    if (lux < 30000) return ['adequado', 'lux-ok']
+    return ['alto', 'lux-high']
+  }
+
+  if (lux < 20000) return ['baixo', 'lux-low']
+  if (lux < 50000) return ['adequado', 'lux-ok']
+  return ['excessivo', 'lux-danger']
+}
+
+// ================= RENDER =================
+function render() {
+  const list = document.getElementById('plants')
+  list.innerHTML = ''
+
+  plants.forEach(p => {
+
+    const next = nextWatering(p)
+    const days = Math.floor((Date.now() - p.startDate) / 86400000)
+    const [status, cls] = luxStatus(p.lux, days)
+
+    list.innerHTML += `
+      <div class="card">
+        <h3>${p.name}</h3>
+
+        <p><b>Idade:</b> ${days} dias</p>
+
+        <p><b>Próxima rega:</b> ${next ? 'Nutriente' : 'Água'}</p>
+
+        <input placeholder="Lux" value="${p.lux || ''}" 
+          onchange="setLux(${p.id}, this.value)" />
+
+        <p class="${cls}">Status luz: ${status}</p>
+
+        <button onclick="addWater(${p.id}, true)">Rega com nutriente</button>
+        <button onclick="addWater(${p.id}, false)">Rega sem nutriente</button>
+      </div>
+    `
+  })
+}
+
+// ================= SET LUX =================
+function setLux(id, value) {
+  const plant = plants.find(p => p.id === id)
+  plant.lux = Number(value)
+  save()
+}
+
+render()
+
+// ================= SERVICE WORKER =================
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js')
+}
+
+</script>
 
 </body>
 </html>
