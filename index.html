@@ -2,159 +2,279 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GrowLog</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a120b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GrowLog Local">
+<title>GrowLog Local</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
 
-<style>
-body { font-family: Arial; background:#111; color:#fff; padding:16px }
-.card { background:#1b1b1b; padding:12px; border-radius:12px; margin-bottom:12px }
-input, select, button { width:100%; padding:10px; margin-top:6px; border-radius:8px; border:none }
-button { background:#4caf50; color:#fff }
-
-.lux-low { color:#ffc107 }
-.lux-ok { color:#4caf50 }
-.lux-high { color:#ff9800 }
-.lux-danger { color:#f44336 }
-</style>
 </head>
-
 <body>
+<div id="app">
+<header>
+  <div class="logo">🌿 GrowLog</div>
+  <div class="hdr-acts">
+    <button class="btn btn-ghost btn-icon" onclick="exportAllCSV()" title="Exportar CSV">📤</button>
+    <button class="btn btn-ghost btn-icon" onclick="exportBackup()" title="Backup JSON">💾</button>
+    <button class="btn btn-ghost btn-icon" onclick="document.getElementById('import-inp').click()" title="Importar backup">📥</button>
+    <input type="file" id="import-inp" accept=".json" style="display:none" onchange="importBackup(event)">
+  </div>
+</header>
 
-<h2>🌱 GrowLog</h2>
+<main>
+  <div class="screen active" id="screen-plants">
+    <div class="overview-card">
+      <div class="overview-head">
+        <div>
+          <div class="overview-title">Painel do cultivo</div>
+          <div class="overview-sub" id="home-sub">Acompanhe regas, ambiente e evolução das plantas.</div>
+        </div>
+        <div class="stage-badge stage-vegetativo" id="home-badge">Local</div>
+      </div>
+      <div class="overview-kpis" id="home-kpis"></div>
+    </div>
 
-<div class="card">
-<h3>Nova Planta</h3>
+    <div class="quick-panel">
+      <button class="qbtn" onclick="quickAction('addPlant')"><strong>Nova planta</strong><span>Cadastre uma genética nova</span></button>
+      <button class="qbtn" onclick="quickAction('openLast')"><strong>Última planta</strong><span>Volta para o acompanhamento mais recente</span></button>
+      <button class="qbtn" onclick="quickAction('showStats')"><strong>Visão geral</strong><span>Resumo de água, ambiente e volume de registros</span></button>
+    </div>
 
-<input id="name" placeholder="Nome da planta">
+    <div class="status-card">
+      <p class="sec-label">Ações sugeridas</p>
+      <div class="status-list" id="status-list"></div>
+    </div>
 
-<select id="cycle">
-<option value="2-1">2 com nutriente / 1 sem</option>
-<option value="1-1">1 com nutriente / 1 sem</option>
-<option value="3-1">3 com nutriente / 1 sem</option>
-</select>
+    <p class="sec-label">Plantas ativas</p>
+    <div class="plant-list" id="plant-list"></div>
+    <button class="btn-add-plant" onclick="openAddPlant()">＋ &nbsp;Nova planta</button>
+  </div>
 
-<button onclick="addPlant()">Salvar</button>
+  <div class="screen" id="screen-detail">
+    <div class="detail-hdr">
+      <span class="back-btn" onclick="showPlants()">←</span>
+      <div class="detail-info">
+        <div class="detail-name" id="d-name">—</div>
+        <div class="detail-sub" id="d-sub">—</div>
+      </div>
+      <div class="detail-acts">
+        <button class="btn btn-ghost btn-icon" onclick="openEditPlant()">✏️</button>
+        <button class="btn btn-danger btn-icon" onclick="confirmDeletePlant()">🗑️</button>
+      </div>
+    </div>
+    <div class="stage-ribbon">
+      <div class="sr-left">
+        <div class="sr-lbl">Estágio atual</div>
+        <div class="sr-val" id="sr-stage">—</div>
+      </div>
+      <div class="sr-counters">
+        <div class="sr-cnt"><div class="sr-num" id="sr-days">—</div><div class="sr-clbl">dias</div></div>
+        <div class="sr-cnt"><div class="sr-num" id="sr-weeks">—</div><div class="sr-clbl">semanas</div></div>
+      </div>
+      <span class="sr-edit" onclick="openStageEditor()">✏️</span>
+    </div>
+    <div class="entry-helper" id="detail-helper">Sem alertas no momento.</div>
+    <div class="action-bar">
+      <button class="btn btn-ghost" onclick="exportPlantCSV()">📊 CSV</button>
+      <button class="btn btn-ghost" onclick="openQuickEntry('water')">💧 Rega rápida</button>
+      <button class="btn btn-ghost" onclick="openQuickEntry('climate')">🌡️ Ambiente</button>
+      <button class="btn btn-primary" onclick="openAddEntry()">＋ Registro</button>
+    </div>
+    <div class="entries-list" id="entries-list"></div>
+  </div>
+
+  <div class="screen" id="screen-stats">
+    <p class="sec-label">Visão geral</p>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div id="stats-charts"></div>
+  </div>
+</main>
+
+<nav class="bnav">
+  <button class="nitem active" data-s="plants" onclick="switchNav(this,'plants')"><span class="ni">🌱</span>Plantas</button>
+  <button class="nitem" data-s="stats" onclick="switchNav(this,'stats')"><span class="ni">📈</span>Visão geral</button>
+</nav>
 </div>
 
-<div id="plants"></div>
-
-<script>
-
-// ================= DADOS =================
-let plants = JSON.parse(localStorage.getItem('growlog_v4') || '[]')
-
-// ================= SAVE =================
-function save() {
-  localStorage.setItem('growlog_v4', JSON.stringify(plants))
-  render()
-}
-
-// ================= ADD PLANT =================
-function addPlant() {
-  const name = document.getElementById('name').value
-  const cycle = document.getElementById('cycle').value
-
-  plants.push({
-    id: Date.now(),
-    name,
-    cycle,
-    history: [],
-    lux: null,
-    startDate: Date.now()
-  })
-
-  save()
-}
-
-// ================= WATER =================
-function addWater(id, nutrient) {
-  const plant = plants.find(p => p.id === id)
-  plant.history.push(nutrient)
-  save()
-}
-
-// ================= NEXT WATER =================
-function nextWatering(plant) {
-  const [n, w] = plant.cycle.split('-').map(Number)
-
-  const seq = [
-    ...Array(n).fill(true),
-    ...Array(w).fill(false)
-  ]
-
-  return seq[plant.history.length % seq.length]
-}
-
-// ================= LUX =================
-function luxStatus(lux, days) {
-  if (!lux) return ['-', '']
-
-  // regra simples por estágio aproximado
-  if (days < 10) {
-    if (lux < 3000) return ['baixo', 'lux-low']
-    if (lux < 10000) return ['adequado', 'lux-ok']
-    return ['alto', 'lux-high']
-  }
-
-  if (days < 40) {
-    if (lux < 10000) return ['baixo', 'lux-low']
-    if (lux < 30000) return ['adequado', 'lux-ok']
-    return ['alto', 'lux-high']
-  }
-
-  if (lux < 20000) return ['baixo', 'lux-low']
-  if (lux < 50000) return ['adequado', 'lux-ok']
-  return ['excessivo', 'lux-danger']
-}
-
-// ================= RENDER =================
-function render() {
-  const list = document.getElementById('plants')
-  list.innerHTML = ''
-
-  plants.forEach(p => {
-
-    const next = nextWatering(p)
-    const days = Math.floor((Date.now() - p.startDate) / 86400000)
-    const [status, cls] = luxStatus(p.lux, days)
-
-    list.innerHTML += `
-      <div class="card">
-        <h3>${p.name}</h3>
-
-        <p><b>Idade:</b> ${days} dias</p>
-
-        <p><b>Próxima rega:</b> ${next ? 'Nutriente' : 'Água'}</p>
-
-        <input placeholder="Lux" value="${p.lux || ''}" 
-          onchange="setLux(${p.id}, this.value)" />
-
-        <p class="${cls}">Status luz: ${status}</p>
-
-        <button onclick="addWater(${p.id}, true)">Rega com nutriente</button>
-        <button onclick="addWater(${p.id}, false)">Rega sem nutriente</button>
+<div class="overlay" id="modal-plant">
+<div class="modal">
+  <div class="modal-title" id="mp-title">Nova Planta</div>
+  <div class="fg"><label>Nome / Strain</label><input id="mp-name" type="text" placeholder="Ex: Lemon Drizzle" autocomplete="off"></div>
+  <div class="frow" style="margin-bottom:12px">
+    <div class="fg" style="margin:0"><label>Tipo</label>
+      <div class="type-opts">
+        <div class="topt sel" data-v="auto" onclick="selType(this)">🔄 Auto</div>
+        <div class="topt" data-v="foto" onclick="selType(this)">📸 Foto</div>
       </div>
-    `
-  })
-}
+    </div>
+    <div class="fg" style="margin:0"><label>Data de início</label><input id="mp-date" type="date"></div>
+  </div>
+  <div class="fg"><label>Ciclo de rega</label>
+    <select id="mp-cycle">
+      <option value="2-1">2 com nutriente / 1 sem</option>
+      <option value="1-1">1 com nutriente / 1 sem</option>
+      <option value="3-1">3 com nutriente / 1 sem</option>
+    </select>
+  </div>
+  <div class="fg"><label>Observações</label><textarea id="mp-obs" rows="2" placeholder="Genética, procedência, vaso, substrato..."></textarea></div>
+  <div class="modal-actions">
+    <button class="btn btn-ghost" onclick="closeModal('modal-plant')">Cancelar</button>
+    <button class="btn btn-primary" onclick="savePlant()">Salvar</button>
+  </div>
+</div>
+</div>
 
-// ================= SET LUX =================
-function setLux(id, value) {
-  const plant = plants.find(p => p.id === id)
-  plant.lux = Number(value)
-  save()
-}
+<div class="overlay" id="modal-stage">
+<div class="modal">
+  <div class="modal-title">Estágio &amp; Progresso</div>
+  <div class="fg"><label>Estágio atual</label>
+    <div class="stage-opts" id="stage-opts">
+      <div class="sopt" data-v="germinacao" onclick="selSopt(this,'stage-opts')">🌰 Germinação</div>
+      <div class="sopt" data-v="plantula"   onclick="selSopt(this,'stage-opts')">🌱 Plântula</div>
+      <div class="sopt sel" data-v="vegetativo" onclick="selSopt(this,'stage-opts')">🍃 Vegetativo</div>
+      <div class="sopt" data-v="floracao"   onclick="selSopt(this,'stage-opts')">🌸 Floração</div>
+      <div class="sopt" data-v="colheita"   onclick="selSopt(this,'stage-opts')">✂️ Colheita</div>
+    </div>
+  </div>
+  <div class="frow" style="margin-top:14px">
+    <div class="fg" style="margin:0"><label>Dias de vida</label><input id="ms-days" type="number" min="0" placeholder="Ex: 14"></div>
+    <div class="fg" style="margin:0"><label>Semana</label><input id="ms-weeks" type="number" min="1" placeholder="Ex: 2"></div>
+  </div>
+  <p class="fhint">O estágio automático agora é tratado como sugestão. Quando você salva aqui, este estágio passa a valer como referência principal.</p>
+  <div class="modal-actions">
+    <button class="btn btn-ghost" onclick="closeModal('modal-stage')">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveStage()">Salvar</button>
+  </div>
+</div>
+</div>
 
-render()
+<div class="overlay" id="modal-entry">
+<div class="modal">
+  <div class="modal-title" id="me-title">Novo Registro</div>
 
-// ================= SERVICE WORKER =================
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js')
-}
+  <div class="fsec">
+    <div class="fsec-title">🗓 Data &amp; estágio</div>
+    <div class="frow" style="margin-bottom:12px">
+      <div class="fg" style="margin:0"><label>Data</label><input id="ef-date" type="date"></div>
+      <div class="fg" style="margin:0"><label>Hora</label><input id="ef-time" type="time"></div>
+    </div>
+    <div class="frow" style="margin-bottom:12px">
+      <div class="fg" style="margin:0"><label>Semana</label><input id="ef-week" type="number" min="1" placeholder="Semana"></div>
+      <div class="fg" style="margin:0"><label>Dias de vida</label><input id="ef-days" type="number" min="0" placeholder="Dias"></div>
+    </div>
+    <div class="fg" style="margin:0"><label>Estágio</label>
+      <div class="stage-opts" id="entry-stage-opts">
+        <div class="sopt" data-v="germinacao" onclick="selSopt(this,'entry-stage-opts')">🌰 Germinação</div>
+        <div class="sopt" data-v="plantula"   onclick="selSopt(this,'entry-stage-opts')">🌱 Plântula</div>
+        <div class="sopt sel" data-v="vegetativo" onclick="selSopt(this,'entry-stage-opts')">🍃 Vegetativo</div>
+        <div class="sopt" data-v="floracao"   onclick="selSopt(this,'entry-stage-opts')">🌸 Floração</div>
+        <div class="sopt" data-v="colheita"   onclick="selSopt(this,'entry-stage-opts')">✂️ Colheita</div>
+      </div>
+    </div>
+  </div>
 
-</script>
+  <div class="fsec">
+    <div class="fsec-title">🌡️ Ambiente</div>
+    <div class="frow">
+      <div class="fg" style="margin:0"><label>Temperatura (°C)</label><input id="ef-temp" type="number" step="0.1" placeholder="24.5"></div>
+      <div class="fg" style="margin:0"><label>Umidade (%)</label><input id="ef-ur" type="number" step="0.1" placeholder="68"></div>
+    </div>
+  </div>
 
+  <div class="fsec">
+    <div class="fsec-title">💡 Luz</div>
+    <div class="frow3" style="margin-bottom:12px">
+      <div class="fg" style="margin:0"><label>Dimmer (%)</label><input id="ef-dimmer" type="number" min="0" max="100" step="1" placeholder="75"></div>
+      <div class="fg" style="margin:0"><label>Distância (cm)</label><input id="ef-dist" type="number" min="0" step="1" placeholder="45"></div>
+      <div class="fg" style="margin:0"><label>Lux</label><input id="ef-lux" type="number" min="0" step="1" placeholder="15000" oninput="recalcLightMetrics()"></div>
+    </div>
+    <div class="frow" style="margin-bottom:12px">
+      <div class="fg" style="margin:0"><label>Liga</label><input id="ef-ledon" type="time" oninput="recalcLightMetrics()"></div>
+      <div class="fg" style="margin:0"><label>Desliga</label><input id="ef-ledoff" type="time" oninput="recalcLightMetrics()"></div>
+    </div>
+    <div class="frow" style="margin-bottom:12px">
+      <div class="fg" style="margin:0"><label>PPFD</label><input id="ef-ppfd" type="number" step="1" placeholder="230" oninput="recalcLightMetrics('ppfd')"></div>
+      <div class="fg" style="margin:0"><label>DLI (mol)</label><input id="ef-dli" type="number" step="0.1" placeholder="12.5"></div>
+    </div>
+    <p class="fhint">Se você preencher lux e fotoperíodo, o app estima PPFD e DLI. Se preencher PPFD e horários, o DLI é atualizado automaticamente.</p>
+    <div id="lux-feedback" class="lux-feedback hidden"></div>
+  </div>
+
+  <div class="fsec">
+    <div class="fsec-title">💧 Rega</div>
+    <div class="tgl-row">
+      <span class="tgl-lbl">Regou hoje?</span>
+      <button class="tgl" id="tgl-water" onclick="toggleSection('tgl-water','water-fields')"><span></span></button>
+    </div>
+    <div id="water-fields" class="coll">
+      <div class="frow" style="margin-bottom:12px">
+        <div class="fg" style="margin:0"><label>Água (ml)</label><input id="ef-water" type="number" step="1" placeholder="1000"></div>
+        <div class="fg" style="margin:0"><label>EC / ppm</label><input id="ef-ec" type="number" step="0.1" placeholder="1.3"></div>
+      </div>
+      <div class="fg" style="margin:0"><label>pH</label><input id="ef-ph" type="number" step="0.1" placeholder="6.2"></div>
+      <div class="tgl-row" style="margin-top:12px">
+        <span class="tgl-lbl">Usou nutrientes?</span>
+        <button class="tgl" id="tgl-nut" onclick="toggleSection('tgl-nut','nut-section')"><span></span></button>
+      </div>
+      <div id="nut-section" class="coll">
+        <div class="frow" style="margin-bottom:10px">
+          <div class="fg" style="margin:0"><label>Nutriente</label><input id="nut-input" type="text" placeholder="Ex: Grow A"></div>
+          <div class="fg" style="margin:0;max-width:120px"><label>Qtd (ml/L)</label><input id="nut-qty" type="number" step="0.1" placeholder="2"></div>
+        </div>
+        <button class="btn btn-ghost" onclick="addNutrient()">＋ Adicionar nutriente</button>
+        <div class="nut-tags" id="nut-tags"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fsec">
+    <div class="fsec-title">📸 Fotos</div>
+    <div class="photo-wrap" id="photo-preview"></div>
+    <div class="photo-btns">
+      <label for="ef-photo-gallery" class="btn btn-ghost" style="cursor:pointer;flex:1;justify-content:center">🖼️ Galeria</label>
+      <label for="ef-photo-camera"  class="btn btn-ghost" style="cursor:pointer;flex:1;justify-content:center">📷 Câmera</label>
+    </div>
+    <input type="file" id="ef-photo-gallery" accept="image/*" multiple style="display:none" onchange="handlePhotoInput(event)">
+    <input type="file" id="ef-photo-camera" accept="image/*" capture="environment" multiple style="display:none" onchange="handlePhotoInput(event)">
+  </div>
+
+  <div class="fsec">
+    <div class="fsec-title">📝 Observações</div>
+    <div class="fg" style="margin:0"><textarea id="ef-obs" rows="4" placeholder="Anote comportamento, folhas, aroma, treinamento, pragas, runoff..."></textarea></div>
+  </div>
+
+  <div class="modal-actions">
+    <button class="btn btn-ghost" onclick="closeModal('modal-entry')">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveEntry()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<div class="overlay" id="confirm-overlay">
+  <div class="modal sm">
+    <div class="modal-title" id="confirm-title">Confirmar</div>
+    <p class="confirm-msg" id="confirm-msg">Tem certeza?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="resolveConfirm(false)">Cancelar</button>
+      <button class="btn btn-danger" id="confirm-ok" onclick="resolveConfirm(true)">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lb-btn lb-close" onclick="closeLightbox()">×</button>
+  <button class="lb-btn lb-prev" onclick="lbStep(-1)">‹</button>
+  <img id="lb-img" alt="">
+  <button class="lb-btn lb-next" onclick="lbStep(1)">›</button>
+  <div class="lb-counter" id="lb-counter"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
 </body>
 </html>
